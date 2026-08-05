@@ -59,7 +59,16 @@ The app is **database-pluggable** via `@libsql/client`:
 3. In the service's **Environment** tab, set:
    - `TURSO_URL` = your Turso URL
    - `TURSO_AUTH_TOKEN` = your Turso token
+   - `RESEND_API_KEY` = your Resend key (for email verification)
+   - `EMAIL_FROM` = e.g. `AniQuest <hi@yourdomain>` (needs a verified domain in Resend)
+   - `APP_URL` = your site's public URL, e.g. `https://aniquest.onrender.com`
 4. Deploy. Your app is live with all features and persistent data.
+
+### 3. Email verification (free, via Resend)
+Signups now require confirming your email:
+1. Create a free account at [resend.com](https://resend.com) (100 emails/day free).
+2. Get an **API key** at resend.com/api-keys → paste into Render as `RESEND_API_KEY`.
+3. **Sender address:** for testing, Resend's `onboarding@resend.dev` works but only delivers to *your own* email. To send to real users, verify a domain in Resend (DNS records) and set `EMAIL_FROM` to an address on it.
 
 > `render.yaml` is already set up with the build/start commands, a health check,
 > and a generated `SESSION_SECRET`. No other config needed.
