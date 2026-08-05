@@ -24,7 +24,8 @@ const client = createClient({
 });
 
 /* ---------------- Schema ---------------- */
-await client.executeMultiple(`
+try {
+  await client.executeMultiple(`
 CREATE TABLE IF NOT EXISTS users (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   email      TEXT    UNIQUE NOT NULL,
@@ -56,6 +57,22 @@ CREATE TABLE IF NOT EXISTS watchlist (
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_watchlist_user ON watchlist(user_id);
 `);
+} catch (e) {
+  const isTurso = Boolean(tursoUrl);
+  console.error('='.repeat(60));
+  console.error('DATABASE CONNECTION FAILED — the server cannot start.');
+  if (isTurso) {
+    console.error('You are using Turso (TURSO_URL is set) but authentication failed.');
+    console.error('Fix: in your host Environment settings, set TURSO_AUTH_TOKEN to a valid');
+    console.error('     read-write token for THIS database, then redeploy.');
+    console.error('Detail:', e.message);
+  } else {
+    console.error('Could not open the local database file.');
+    console.error('Detail:', e.message);
+  }
+  console.error('='.repeat(60));
+  process.exit(1);
+}
 
 /* ---------------- Async query helpers ---------------- */
 function toNum(v) {
