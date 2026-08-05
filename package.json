@@ -12,7 +12,7 @@
     "server:prod": "node server/index.mjs --prod"
   },
   "dependencies": {
-    "better-sqlite3": "^13.0.3",
+    "@libsql/client": "^0.17.4",
     "express": "^5.2.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

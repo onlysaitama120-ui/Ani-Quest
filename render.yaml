@@ -1,0 +1,29 @@
+# Render deployment config for AniQuest
+# Docs: https://render.com/docs/blueprint-spec
+#
+# Deploy steps:
+#   1. Create a free Turso database -> copy its URL + auth token
+#   2. Create a free Render account -> "New" -> "Blueprint"
+#   3. Point it at this repo. Render reads this file.
+#   4. Paste TURSO_URL and TURSO_AUTH_TOKEN into the service env vars.
+#   5. Deploy. Done.
+
+services:
+  - type: web
+    name: aniquest
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: node server/index.mjs --prod
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Persistent session-signing secret (survives redeploys).
+      - key: SESSION_SECRET
+        generateValue: true
+      # Set these two manually from your Turso database (see README).
+      - key: TURSO_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false

@@ -106,21 +106,19 @@ export function clearSessionCookie(res) {
 }
 
 /* ---------------- Auth middleware ---------------- */
-export function requireAuth(req, res, next) {
+export async function requireAuth(req, res, next) {
   const token = readCookie(req, SESSION_COOKIE);
   if (!token) return res.status(401).json({ error: 'Not signed in.' });
 
-  const session = db
-    .prepare('SELECT user_id, expires_at FROM sessions WHERE token_hash = ?')
-    .get(hashToken(token));
+  const session = await db
+    .get('SELECT user_id, expires_at FROM sessions WHERE token_hash = ?', [hashToken(token)]);
 
   if (!session || session.expires_at < Date.now()) {
     return res.status(401).json({ error: 'Session expired. Please sign in again.' });
   }
 
-  const user = db
-    .prepare('SELECT id, email, created_at FROM users WHERE id = ?')
-    .get(session.user_id);
+  const user = await db
+    .get('SELECT id, email, created_at FROM users WHERE id = ?', [session.user_id]);
 
   if (!user) return res.status(401).json({ error: 'Session invalid.' });
 
@@ -130,8 +128,10 @@ export function requireAuth(req, res, next) {
 
 /** Delete expired sessions periodically. */
 export function startSessionCleanup() {
-  setInterval(() => {
-    db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now());
+  setInterval(async () => {
+    try {
+      await db.run('DELETE FROM sessions WHERE expires_at < ?', [Date.now()]);
+    } catch { /* ignore */ }
   }, CLEANUP_INTERVAL_MS);
-  db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now());
+  db.run('DELETE FROM sessions WHERE expires_at < ?', [Date.now()]).catch(() => {});
 }

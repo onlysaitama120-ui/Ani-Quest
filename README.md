@@ -40,6 +40,37 @@ auto-generated to `.secret` on first run — both are gitignored.
 
 Both are normalized into one shape, so pages never care which backend served the data.
 
+## Deploy for free (with persistent accounts)
+
+The app is **database-pluggable** via `@libsql/client`:
+
+- **No env vars set** → uses a local SQLite file (`data/aniquest.db`) — great for dev, but data resets on a free host's redeploy.
+- **`TURSO_URL` + `TURSO_AUTH_TOKEN` set** → uses **Turso**, a free hosted SQLite, so accounts & watchlists **persist forever** even on free hosting.
+
+### 1. Create a free Turso database (persistent data)
+1. Sign up at [turso.tech](https://turso.tech) (free).
+2. Create a database (e.g. `aniquest`).
+3. Copy its **URL** (looks like `libsql://aniquest-xxxx.turso.io`) and create an **auth token**.
+4. Keep those two values — you'll paste them into Render.
+
+### 2. Deploy to Render (free)
+1. Sign up at [render.com](https://render.com) (free).
+2. **New → Blueprint** and point it at this repo. Render reads `render.yaml`.
+3. In the service's **Environment** tab, set:
+   - `TURSO_URL` = your Turso URL
+   - `TURSO_AUTH_TOKEN` = your Turso token
+4. Deploy. Your app is live with all features and persistent data.
+
+> `render.yaml` is already set up with the build/start commands, a health check,
+> and a generated `SESSION_SECRET`. No other config needed.
+
+### Run it locally
+```bash
+npm install
+npm run server    # backend API on http://localhost:4000
+npm run dev       # Vite frontend on http://localhost:5173 (proxies /api)
+```
+
 ## Accounts & security
 
 Accounts use email + password only. The backend:

@@ -32,15 +32,17 @@ function publicUser(row) {
   return { id: row.id, email: row.email, created_at: row.created_at };
 }
 
-function createSession(userId, res) {
+async function createSession(userId, res) {
   const token = newSessionToken();
-  db.prepare('INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)')
-    .run(hashToken(token), userId, Date.now(), Date.now() + SESSION_TTL_MS);
+  await db.run(
+    'INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)',
+    [hashToken(token), userId, Date.now(), Date.now() + SESSION_TTL_MS],
+  );
   setSessionCookie(res, token);
 }
 
 /* POST /api/auth/signup */
-router.post('/signup', authLimit, (req, res) => {
+router.post('/signup', authLimit, async (req, res) => {
   const { email, password } = req.body || {};
 
   if (!isValidEmail(email)) {
@@ -51,44 +53,45 @@ router.post('/signup', authLimit, (req, res) => {
     return res.status(400).json({ error: passwordErr });
   }
 
-  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(String(email).toLowerCase());
+  const existing = await db.get('SELECT id FROM users WHERE email = ?', [String(email).toLowerCase()]);
   if (existing) {
     return res.status(409).json({ error: 'An account with that email already exists.' });
   }
 
   const salt = newSalt();
   const hash = hashPassword(password, salt);
-  const info = db
-    .prepare('INSERT INTO users (email, pass_hash, pass_salt, created_at) VALUES (?, ?, ?, ?)')
-    .run(String(email).toLowerCase(), hash, salt, Date.now());
+  const info = await db.run(
+    'INSERT INTO users (email, pass_hash, pass_salt, created_at) VALUES (?, ?, ?, ?)',
+    [String(email).toLowerCase(), hash, salt, Date.now()],
+  );
 
-  const user = db.prepare('SELECT id, email, created_at FROM users WHERE id = ?').get(info.lastInsertRowid);
-  createSession(user.id, res);
+  const user = await db.get('SELECT id, email, created_at FROM users WHERE id = ?', [info.lastInsertRowid]);
+  await createSession(user.id, res);
   res.status(201).json({ user: publicUser(user) });
 });
 
 /* POST /api/auth/login */
-router.post('/login', authLimit, (req, res) => {
+router.post('/login', authLimit, async (req, res) => {
   const { email, password } = req.body || {};
 
   if (typeof email !== 'string' || typeof password !== 'string') {
     return res.status(400).json({ error: 'Enter your email and password.' });
   }
 
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(String(email).toLowerCase().trim());
+  const user = await db.get('SELECT * FROM users WHERE email = ?', [String(email).toLowerCase().trim()]);
   if (!user || !verifyPassword(password, user.pass_salt, user.pass_hash)) {
     return res.status(401).json({ error: 'Incorrect email or password.' });
   }
 
-  createSession(user.id, res);
+  await createSession(user.id, res);
   res.json({ user: publicUser(user) });
 });
 
 /* POST /api/auth/logout */
-router.post('/logout', (req, res) => {
+router.post('/logout', async (req, res) => {
   const token = readCookie(req, SESSION_COOKIE);
   if (token) {
-    db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(hashToken(token));
+    await db.run('DELETE FROM sessions WHERE token_hash = ?', [hashToken(token)]);
   }
   clearSessionCookie(res);
   res.json({ ok: true });
