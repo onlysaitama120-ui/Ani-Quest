@@ -20,6 +20,9 @@ server.log
 # Local audit artifacts
 lh.json
 
+# CI workflow lives locally until GitHub token gains `workflow` scope
+.github/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
