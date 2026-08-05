@@ -14,8 +14,8 @@
 
 import { createClient } from '@libsql/client';
 
-const tursoUrl = process.env.TURSO_URL;
-const tursoToken = process.env.TURSO_AUTH_TOKEN;
+const tursoUrl = (process.env.TURSO_URL || '').trim();
+const tursoToken = (process.env.TURSO_AUTH_TOKEN || '').trim();
 const localPath = process.env.DB_PATH || 'file:./data/aniquest.db';
 
 const client = createClient({
