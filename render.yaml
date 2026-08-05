@@ -19,6 +19,9 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # Vite 8 requires Node >= 20.19 / >= 22.12 — pin a supported LTS.
+      - key: NODE_VERSION
+        value: 22.12.0
       # Persistent session-signing secret (survives redeploys).
       - key: SESSION_SECRET
         generateValue: true
