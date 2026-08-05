@@ -30,11 +30,21 @@ services:
         sync: false
       - key: TURSO_AUTH_TOKEN
         sync: false
-      # Email verification. Set ONE provider key (any works):
-      # Mailer To Go (recommended — zero-config, no domain, emails anyone)
+      # Email verification. Set ONE method (any works, SMTP recommended):
+      # 1. Gmail/any SMTP (free, no domain, delivers to everyone):
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_SECURE
+        sync: false
+      # 2. Mailer To Go (zero-config, no domain) / 3. Brevo / 4. Resend
       - key: MAILERTOGO_API_KEY
         sync: false
-      # Brevo (needs a verified sender) / Resend (needs a verified domain)
       - key: BREVO_API_KEY
         sync: false
       - key: RESEND_API_KEY

@@ -1,26 +1,30 @@
 /**
  * ANIQUEST backend — email delivery.
  *
- * Supports three providers so you can use whichever free tier suits you.
- * Precedence: Mailer To Go > Brevo > Resend. Only the key you set is used.
+ * Provider precedence: Gmail/any SMTP > Mailer To Go > Brevo > Resend.
+ * Only the one you configure is used — set one set of env vars.
  *
- *   1. MAILERTOGO_API_KEY  -> Mailer To Go  (ZERO-config, no domain/DNS,
- *                            free tier, emails anyone. Recommended.)
- *   2. BREVO_API_KEY       -> Brevo         (300/day, needs sender verified)
- *   3. RESEND_API_KEY      -> Resend        (100/day, needs a verified domain
- *                            to email anyone; onboarding@resend.dev only emails you)
+ * 1. SMTP (recommended, free, delivers to everyone):
+ *    SMTP_USER + SMTP_PASS (Gmail App Password) — no domain, no card,
+ *    ~500 emails/day via your own Gmail account.
+ *      - SMTP_HOST (default smtp.gmail.com), SMTP_PORT (default 465)
+ *      - SMTP_SECURE (default true)
+ *      - EMAIL_FROM (defaults to SMTP_USER)
+ * 2. MAILERTOGO_API_KEY — Mailer To Go (zero-config, no domain)
+ * 3. BREVO_API_KEY       — Brevo (300/day, verify sender)
+ * 4. RESEND_API_KEY      — Resend (100/day, needs verified domain for others)
  *
- * Shared vars:
- *   EMAIL_FROM       — sender address / "Name <email>".
- *   EMAIL_FROM_NAME  — display name if EMAIL_FROM is a bare address.
- *   APP_URL          — public URL used in the verification link.
+ * Shared: EMAIL_FROM, EMAIL_FROM_NAME, APP_URL.
  */
+
+import nodemailer from 'nodemailer';
 
 const MAILERTOGO_URL = 'https://api.mailertogo.com/v1/send';
 const BREVO_URL = 'https://api.brevo.com/v3/smtp/email';
 const RESEND_URL = 'https://api.resend.com/emails';
 
 function whichProvider() {
+  if ((process.env.SMTP_USER || '').trim()) return 'smtp';
   if ((process.env.MAILERTOGO_API_KEY || '').trim()) return 'mailertogo';
   if ((process.env.BREVO_API_KEY || '').trim()) return 'brevo';
   if ((process.env.RESEND_API_KEY || '').trim()) return 'resend';
@@ -78,61 +82,72 @@ function htmlTemplate(verifyUrl) {
 </div>`;
 }
 
-/**
- * Send the verification email. Throws on failure.
- */
-export async function sendVerificationEmail(to, verifyUrl) {
-  const provider = whichProvider();
-  if (!provider) {
-    throw new Error('Email service is not configured (no API key set).');
-  }
-  const recipient = String(to).toLowerCase();
-  const subject = 'Confirm your AniQuest account';
-  const html = htmlTemplate(verifyUrl);
+/* ---------------- SMTP (Gmail etc.) ---------------- */
+async function sendViaSmtp({ to, subject, html }) {
+  const user = process.env.SMTP_USER.trim();
+  const pass = process.env.SMTP_PASS || '';
+  const host = (process.env.SMTP_HOST || 'smtp.gmail.com').trim();
+  const port = Number(process.env.SMTP_PORT || 465);
+  const secure = (process.env.SMTP_SECURE || 'true') !== 'false';
 
-  if (provider === 'mailertogo') {
-    const key = process.env.MAILERTOGO_API_KEY.trim();
-    const from = parseSender(process.env.EMAIL_FROM).email || `noreply@${fromName().toLowerCase()}.app`;
-    const res = await fetch(MAILERTOGO_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${key}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ from, to: recipient, subject, html }),
-    });
-    if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      throw new Error(`MailerToGo error ${res.status}: ${body.slice(0, 300)}`);
-    }
-    return res.json();
-  }
+  const from = parseSender(process.env.EMAIL_FROM).email || user;
 
-  if (provider === 'brevo') {
-    const key = process.env.BREVO_API_KEY.trim();
-    const sender = parseSender(process.env.EMAIL_FROM);
-    const res = await fetch(BREVO_URL, {
-      method: 'POST',
-      headers: {
-        'api-key': key,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify({
-        sender,
-        to: [{ email: recipient }],
-        subject,
-        htmlContent: html,
-      }),
-    });
-    if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      throw new Error(`Brevo error ${res.status}: ${body.slice(0, 300)}`);
-    }
-    return res.json();
-  }
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: { user, pass },
+  });
 
-  // Resend
+  await transporter.sendMail({
+    from: `${fromName()} <${from}>`,
+    to,
+    subject,
+    html,
+  });
+}
+
+/* ---------------- Mailer To Go ---------------- */
+async function sendViaMailerToGo({ to, subject, html }) {
+  const key = process.env.MAILERTOGO_API_KEY.trim();
+  const from = parseSender(process.env.EMAIL_FROM).email || 'noreply@aniquest.app';
+  const res = await fetch(MAILERTOGO_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ from, to, subject, html }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`MailerToGo error ${res.status}: ${body.slice(0, 300)}`);
+  }
+  return res.json();
+}
+
+/* ---------------- Brevo ---------------- */
+async function sendViaBrevo({ to, subject, html }) {
+  const key = process.env.BREVO_API_KEY.trim();
+  const sender = parseSender(process.env.EMAIL_FROM);
+  const res = await fetch(BREVO_URL, {
+    method: 'POST',
+    headers: {
+      'api-key': key,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ sender, to: [{ email: to }], subject, htmlContent: html }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Brevo error ${res.status}: ${body.slice(0, 300)}`);
+  }
+  return res.json();
+}
+
+/* ---------------- Resend ---------------- */
+async function sendViaResend({ to, subject, html }) {
   const key = process.env.RESEND_API_KEY.trim();
   const from = (process.env.EMAIL_FROM || '').trim() || 'AniQuest <onboarding@resend.dev>';
   const res = await fetch(RESEND_URL, {
@@ -141,11 +156,36 @@ export async function sendVerificationEmail(to, verifyUrl) {
       Authorization: `Bearer ${key}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ from, to: [recipient], subject, html }),
+    body: JSON.stringify({ from, to: [to], subject, html }),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     throw new Error(`Resend error ${res.status}: ${body.slice(0, 300)}`);
   }
   return res.json();
+}
+
+/** Send the verification email. Throws on failure. */
+export async function sendVerificationEmail(to, verifyUrl) {
+  const provider = whichProvider();
+  if (!provider) {
+    throw new Error('Email service is not configured (no API key / SMTP set).');
+  }
+
+  const recipient = String(to).toLowerCase();
+  const subject = 'Confirm your AniQuest account';
+  const html = htmlTemplate(verifyUrl);
+
+  switch (provider) {
+    case 'smtp':
+      return sendViaSmtp({ to: recipient, subject, html });
+    case 'mailertogo':
+      return sendViaMailerToGo({ to: recipient, subject, html });
+    case 'brevo':
+      return sendViaBrevo({ to: recipient, subject, html });
+    case 'resend':
+      return sendViaResend({ to: recipient, subject, html });
+    default:
+      throw new Error('Unknown email provider.');
+  }
 }
