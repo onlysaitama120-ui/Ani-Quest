@@ -1,28 +1,45 @@
 /**
- * ANIQUEST backend — email delivery via Brevo (free tier: hundreds of emails/day).
+ * ANIQUEST backend — email delivery.
  *
- * Unlike Resend's unverified sender, Brevo lets you send to ANY recipient as
- * long as you verify a sender email address once (no domain required).
+ * Supports three providers so you can use whichever free tier suits you.
+ * Precedence: Mailer To Go > Brevo > Resend. Only the key you set is used.
  *
- * Env vars:
- *   BREVO_API_KEY  — required. Get one at https://app.brevo.com (Settings -> SMTP & API).
- *   EMAIL_FROM     — a verified sender email, e.g. onlysaitama120@gmail.com
- *                    (verify it in Brevo: they email you a confirmation link).
- *   EMAIL_FROM_NAME— display name, defaults to "AniQuest".
- *   APP_URL        — public base URL of the app, e.g. https://aniquest.onrender.com
- *                    (if unset, derived from the request host).
+ *   1. MAILERTOGO_API_KEY  -> Mailer To Go  (ZERO-config, no domain/DNS,
+ *                            free tier, emails anyone. Recommended.)
+ *   2. BREVO_API_KEY       -> Brevo         (300/day, needs sender verified)
+ *   3. RESEND_API_KEY      -> Resend        (100/day, needs a verified domain
+ *                            to email anyone; onboarding@resend.dev only emails you)
+ *
+ * Shared vars:
+ *   EMAIL_FROM       — sender address / "Name <email>".
+ *   EMAIL_FROM_NAME  — display name if EMAIL_FROM is a bare address.
+ *   APP_URL          — public URL used in the verification link.
  */
 
-export function isEmailConfigured() {
-  return Boolean((process.env.BREVO_API_KEY || '').trim());
+const MAILERTOGO_URL = 'https://api.mailertogo.com/v1/send';
+const BREVO_URL = 'https://api.brevo.com/v3/smtp/email';
+const RESEND_URL = 'https://api.resend.com/emails';
+
+function whichProvider() {
+  if ((process.env.MAILERTOGO_API_KEY || '').trim()) return 'mailertogo';
+  if ((process.env.BREVO_API_KEY || '').trim()) return 'brevo';
+  if ((process.env.RESEND_API_KEY || '').trim()) return 'resend';
+  return null;
 }
 
-/** Parse "Name <email>" or plain "email". */
+export function isEmailConfigured() {
+  return whichProvider() !== null;
+}
+
+function fromName() {
+  return (process.env.EMAIL_FROM_NAME || '').trim() || 'AniQuest';
+}
+
 function parseSender(raw) {
   const s = String(raw || '').trim();
   const m = s.match(/^([^<]+)<([^>]+)>$/);
   if (m) return { name: m[1].trim(), email: m[2].trim() };
-  return { name: (process.env.EMAIL_FROM_NAME || '').trim() || 'AniQuest', email: s };
+  return { name: fromName(), email: s };
 }
 
 /** Build the verification link (works with the app's hash router). */
@@ -38,32 +55,8 @@ export function buildVerifyUrl(req, token) {
   return `${base}/#/verify?token=${encodeURIComponent(token)}`;
 }
 
-/**
- * Send the verification email. Throws on failure (network, invalid key,
- * unverified sender, etc.).
- */
-export async function sendVerificationEmail(to, verifyUrl) {
-  if (!isEmailConfigured()) {
-    throw new Error('Email service is not configured (BREVO_API_KEY missing).');
-  }
-
-  const sender = parseSender(process.env.EMAIL_FROM);
-  if (!sender.email) {
-    throw new Error('EMAIL_FROM is not configured.');
-  }
-
-  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-    method: 'POST',
-    headers: {
-      'api-key': process.env.BREVO_API_KEY.trim(),
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify({
-      sender,
-      to: [{ email: String(to).toLowerCase() }],
-      subject: 'Confirm your AniQuest account',
-      htmlContent: `
+function htmlTemplate(verifyUrl) {
+  return `
 <div style="max-width:520px;margin:0 auto;font-family:Arial,Helvetica,sans-serif;color:#1a1713;">
   <div style="text-align:center;padding:32px 24px;background:#faf8f5;border:1px solid #e6e0d8;border-radius:16px;">
     <div style="width:48px;height:48px;line-height:48px;margin:0 auto 12px;background:#e60023;color:#fff;border-radius:12px;font-size:26px;font-weight:800;">A</div>
@@ -82,13 +75,77 @@ export async function sendVerificationEmail(to, verifyUrl) {
       This link expires in 24 hours. If you didn't create this account, you can ignore this email.
     </p>
   </div>
-</div>`,
-    }),
-  });
+</div>`;
+}
 
+/**
+ * Send the verification email. Throws on failure.
+ */
+export async function sendVerificationEmail(to, verifyUrl) {
+  const provider = whichProvider();
+  if (!provider) {
+    throw new Error('Email service is not configured (no API key set).');
+  }
+  const recipient = String(to).toLowerCase();
+  const subject = 'Confirm your AniQuest account';
+  const html = htmlTemplate(verifyUrl);
+
+  if (provider === 'mailertogo') {
+    const key = process.env.MAILERTOGO_API_KEY.trim();
+    const from = parseSender(process.env.EMAIL_FROM).email || `noreply@${fromName().toLowerCase()}.app`;
+    const res = await fetch(MAILERTOGO_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ from, to: recipient, subject, html }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`MailerToGo error ${res.status}: ${body.slice(0, 300)}`);
+    }
+    return res.json();
+  }
+
+  if (provider === 'brevo') {
+    const key = process.env.BREVO_API_KEY.trim();
+    const sender = parseSender(process.env.EMAIL_FROM);
+    const res = await fetch(BREVO_URL, {
+      method: 'POST',
+      headers: {
+        'api-key': key,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        sender,
+        to: [{ email: recipient }],
+        subject,
+        htmlContent: html,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`Brevo error ${res.status}: ${body.slice(0, 300)}`);
+    }
+    return res.json();
+  }
+
+  // Resend
+  const key = process.env.RESEND_API_KEY.trim();
+  const from = (process.env.EMAIL_FROM || '').trim() || 'AniQuest <onboarding@resend.dev>';
+  const res = await fetch(RESEND_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ from, to: [recipient], subject, html }),
+  });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw new Error(`Brevo error ${res.status}: ${body.slice(0, 300)}`);
+    throw new Error(`Resend error ${res.status}: ${body.slice(0, 300)}`);
   }
   return res.json();
 }

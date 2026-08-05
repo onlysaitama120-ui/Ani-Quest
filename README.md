@@ -64,17 +64,23 @@ The app is **database-pluggable** via `@libsql/client`:
    - `APP_URL` = your site's public URL, e.g. `https://aniquest.onrender.com`
 4. Deploy. Your app is live with all features and persistent data.
 
-### 3. Email verification (free, via Brevo — reaches anyone)
-Signups require confirming your email:
-1. Create a free account at [brevo.com](https://www.brevo.com).
-2. Get an **API key** (Settings → SMTP & API) → paste into Render as `BREVO_API_KEY`.
-3. **Verify a sender email** in Brevo (they email you a confirmation link) — this can be
-   your own address, e.g. `you@gmail.com`. No domain needed.
-4. Set `EMAIL_FROM` to that verified address (e.g. `you@gmail.com`) and optionally
-   `EMAIL_FROM_NAME` (defaults to "AniQuest").
+### 3. Email verification (free, emails anyone — no domain needed)
+Signups require confirming your email. **Any one** of these free providers works:
 
-> Brevo's free tier allows sending to **any** recipient from a verified sender email —
-> unlike Resend's unverified sender, which only delivers to your own address.
+| Provider | Free limit | Setup | Best for |
+|---|---|---|---|
+| **Mailer To Go** ⭐ | Free tier | **Zero-config** — no domain, no DNS, no card | Recommended |
+| **Brevo** | 300/day | Verify a sender email (they email you a link) | Good free tier |
+| **Resend** | 100/day | Needs a verified domain to email anyone | If you own a domain |
+
+The app auto-detects whichever API key you set:
+- `MAILERTOGO_API_KEY` (recommended — sign up at mailertogo.com, copy the key)
+- or `BREVO_API_KEY` (brevo.com → Settings → SMTP & API)
+- or `RESEND_API_KEY` (resend.com/api-keys)
+
+Plus:
+- `EMAIL_FROM` = a sender address (e.g. `AniQuest <no-reply@aniquest.app>` — with Mailer To Go any address works, no verification needed)
+- `APP_URL` = your site's public URL, e.g. `https://aniquest.onrender.com`
 
 > `render.yaml` is already set up with the build/start commands, a health check,
 > and a generated `SESSION_SECRET`. No other config needed.
