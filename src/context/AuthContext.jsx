@@ -38,12 +38,11 @@ export function AuthProvider({ children }) {
       return d.user;
     };
 
-    // Returns the API response; the caller decides what to do if verification
-    // is required (we do NOT auto-login on signup).
+    // Signup auto-logs the user in (no email verification).
     const signup = async (email, password) => {
       const d = await apiSignup(email, password);
-      if (!d.needsVerification) setUser(d.user);
-      return d;
+      setUser(d.user);
+      return d.user;
     };
 
     const logout = async () => {

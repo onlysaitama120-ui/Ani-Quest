@@ -59,32 +59,10 @@ The app is **database-pluggable** via `@libsql/client`:
 3. In the service's **Environment** tab, set:
    - `TURSO_URL` = your Turso URL
    - `TURSO_AUTH_TOKEN` = your Turso token
-   - **Email method** — see step 3 below (e.g. `SMTP_USER` + `SMTP_PASS` for Gmail)
    - `APP_URL` = your site's public URL, e.g. `https://aniquest.onrender.com`
 4. Deploy. Your app is live with all features and persistent data.
 
-### 3. Email verification (free, delivers to everyone)
-Signups require confirming your email. **Any one** of these free methods works:
-
-| Method | Free limit | Setup | Delivers to anyone? |
-|---|---|---|---|
-| **Gmail / SMTP** ⭐ | ~500/day | Use your own Gmail + App Password | ✅ Yes |
-| **Mailer To Go** | Free tier | Zero-config, no domain | ✅ Yes |
-| **Brevo** | 300/day | Verify a sender email | ✅ Yes |
-| **Resend** | 100/day | Needs a verified domain | ⚠️ Only you without domain |
-
-**Recommended — your own Gmail via SMTP (free, reliable, reaches domestic users):**
-1. In your Google account, turn on **2-Step Verification**.
-2. Go to **Google Account → Security → App passwords** → create one for "Mail".
-3. Copy the 16-char password.
-4. In Render set:
-   - `SMTP_USER` = your Gmail address
-   - `SMTP_PASS` = the App Password
-   - `EMAIL_FROM` = your Gmail address
-   - `APP_URL` = your site URL (e.g. `https://aniquest.onrender.com`)
-
-The app auto-detects whichever email method you configure (`SMTP`, `MAILERTOGO_API_KEY`,
-`BREVO_API_KEY`, or `RESEND_API_KEY`).
+> No email service is required — signups work instantly with any email.
 
 > `render.yaml` is already set up with the build/start commands, a health check,
 > and a generated `SESSION_SECRET`. No other config needed.
