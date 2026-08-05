@@ -30,11 +30,14 @@ services:
         sync: false
       - key: TURSO_AUTH_TOKEN
         sync: false
-      # Email verification (Resend). Get an API key at https://resend.com/api-keys
-      - key: RESEND_API_KEY
+      # Email verification (Brevo). Get an API key at https://app.brevo.com
+      - key: BREVO_API_KEY
         sync: false
-      # Sender. Requires a verified domain in Resend for real delivery.
+      # Verified sender email (no domain needed — verify the address in Brevo).
       - key: EMAIL_FROM
+        sync: false
+      # Optional display name for the sender (defaults to "AniQuest").
+      - key: EMAIL_FROM_NAME
         sync: false
       # Public URL of this app (used in verification emails). If unset, it is
       # derived from the request host automatically.

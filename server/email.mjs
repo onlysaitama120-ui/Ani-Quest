@@ -1,22 +1,28 @@
 /**
- * ANIQUEST backend — email delivery via Resend (free tier: 100 emails/day).
+ * ANIQUEST backend — email delivery via Brevo (free tier: hundreds of emails/day).
+ *
+ * Unlike Resend's unverified sender, Brevo lets you send to ANY recipient as
+ * long as you verify a sender email address once (no domain required).
  *
  * Env vars:
- *   RESEND_API_KEY   — required. Get one at https://resend.com/api-keys
- *   EMAIL_FROM       — sender. Defaults to onboarding@resend.dev (Resend's
- *                      testing sender, which only delivers to YOUR email).
- *                      For real users you must verify a domain in Resend and
- *                      set EMAIL_FROM to something like "AniQuest <hi@yourdomain>".
- *   APP_URL          — public base URL of the app, e.g. https://aniquest.onrender.com
- *                      (if unset, derived from the request host).
+ *   BREVO_API_KEY  — required. Get one at https://app.brevo.com (Settings -> SMTP & API).
+ *   EMAIL_FROM     — a verified sender email, e.g. onlysaitama120@gmail.com
+ *                    (verify it in Brevo: they email you a confirmation link).
+ *   EMAIL_FROM_NAME— display name, defaults to "AniQuest".
+ *   APP_URL        — public base URL of the app, e.g. https://aniquest.onrender.com
+ *                    (if unset, derived from the request host).
  */
 
 export function isEmailConfigured() {
-  return Boolean((process.env.RESEND_API_KEY || '').trim());
+  return Boolean((process.env.BREVO_API_KEY || '').trim());
 }
 
-function getFrom() {
-  return (process.env.EMAIL_FROM || '').trim() || 'AniQuest <onboarding@resend.dev>';
+/** Parse "Name <email>" or plain "email". */
+function parseSender(raw) {
+  const s = String(raw || '').trim();
+  const m = s.match(/^([^<]+)<([^>]+)>$/);
+  if (m) return { name: m[1].trim(), email: m[2].trim() };
+  return { name: (process.env.EMAIL_FROM_NAME || '').trim() || 'AniQuest', email: s };
 }
 
 /** Build the verification link (works with the app's hash router). */
@@ -38,20 +44,26 @@ export function buildVerifyUrl(req, token) {
  */
 export async function sendVerificationEmail(to, verifyUrl) {
   if (!isEmailConfigured()) {
-    throw new Error('Email service is not configured (RESEND_API_KEY missing).');
+    throw new Error('Email service is not configured (BREVO_API_KEY missing).');
   }
 
-  const res = await fetch('https://api.resend.com/emails', {
+  const sender = parseSender(process.env.EMAIL_FROM);
+  if (!sender.email) {
+    throw new Error('EMAIL_FROM is not configured.');
+  }
+
+  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${process.env.RESEND_API_KEY.trim()}`,
+      'api-key': process.env.BREVO_API_KEY.trim(),
       'Content-Type': 'application/json',
+      Accept: 'application/json',
     },
     body: JSON.stringify({
-      from: getFrom(),
-      to: [String(to).toLowerCase()],
+      sender,
+      to: [{ email: String(to).toLowerCase() }],
       subject: 'Confirm your AniQuest account',
-      html: `
+      htmlContent: `
 <div style="max-width:520px;margin:0 auto;font-family:Arial,Helvetica,sans-serif;color:#1a1713;">
   <div style="text-align:center;padding:32px 24px;background:#faf8f5;border:1px solid #e6e0d8;border-radius:16px;">
     <div style="width:48px;height:48px;line-height:48px;margin:0 auto 12px;background:#e60023;color:#fff;border-radius:12px;font-size:26px;font-weight:800;">A</div>
@@ -76,7 +88,7 @@ export async function sendVerificationEmail(to, verifyUrl) {
 
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw new Error(`Resend error ${res.status}: ${body.slice(0, 300)}`);
+    throw new Error(`Brevo error ${res.status}: ${body.slice(0, 300)}`);
   }
   return res.json();
 }

@@ -64,11 +64,17 @@ The app is **database-pluggable** via `@libsql/client`:
    - `APP_URL` = your site's public URL, e.g. `https://aniquest.onrender.com`
 4. Deploy. Your app is live with all features and persistent data.
 
-### 3. Email verification (free, via Resend)
-Signups now require confirming your email:
-1. Create a free account at [resend.com](https://resend.com) (100 emails/day free).
-2. Get an **API key** at resend.com/api-keys → paste into Render as `RESEND_API_KEY`.
-3. **Sender address:** for testing, Resend's `onboarding@resend.dev` works but only delivers to *your own* email. To send to real users, verify a domain in Resend (DNS records) and set `EMAIL_FROM` to an address on it.
+### 3. Email verification (free, via Brevo — reaches anyone)
+Signups require confirming your email:
+1. Create a free account at [brevo.com](https://www.brevo.com).
+2. Get an **API key** (Settings → SMTP & API) → paste into Render as `BREVO_API_KEY`.
+3. **Verify a sender email** in Brevo (they email you a confirmation link) — this can be
+   your own address, e.g. `you@gmail.com`. No domain needed.
+4. Set `EMAIL_FROM` to that verified address (e.g. `you@gmail.com`) and optionally
+   `EMAIL_FROM_NAME` (defaults to "AniQuest").
+
+> Brevo's free tier allows sending to **any** recipient from a verified sender email —
+> unlike Resend's unverified sender, which only delivers to your own address.
 
 > `render.yaml` is already set up with the build/start commands, a health check,
 > and a generated `SESSION_SECRET`. No other config needed.
