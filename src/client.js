@@ -18,6 +18,7 @@ async function request(path, options = {}) {
   if (!res.ok) {
     const err = new Error(data.error || 'Request failed');
     err.status = res.status;
+    err.data = data;
     throw err;
   }
   return data;
@@ -26,6 +27,12 @@ async function request(path, options = {}) {
 /* ---------------- Auth ---------------- */
 export const apiSignup = (email, password) =>
   request('/api/auth/signup', { method: 'POST', body: JSON.stringify({ email, password }) });
+
+export const apiVerify = (token) =>
+  request(`/api/auth/verify?token=${encodeURIComponent(token)}`);
+
+export const apiResendVerification = (email) =>
+  request('/api/auth/resend', { method: 'POST', body: JSON.stringify({ email }) });
 
 export const apiLogin = (email, password) =>
   request('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });

@@ -21,21 +21,37 @@ export function AuthProvider({ children }) {
   }, []);
 
   const value = useMemo(() => {
+    const refresh = async () => {
+      try {
+        const d = await apiMe();
+        setUser(d.user || null);
+        return d.user || null;
+      } catch {
+        setUser(null);
+        return null;
+      }
+    };
+
     const login = async (email, password) => {
       const d = await apiLogin(email, password);
       setUser(d.user);
       return d.user;
     };
+
+    // Returns the API response; the caller decides what to do if verification
+    // is required (we do NOT auto-login on signup).
     const signup = async (email, password) => {
       const d = await apiSignup(email, password);
-      setUser(d.user);
-      return d.user;
+      if (!d.needsVerification) setUser(d.user);
+      return d;
     };
+
     const logout = async () => {
       try { await apiLogout(); } catch { /* already signed out */ }
       setUser(null);
     };
-    return { user, loading, login, signup, logout };
+
+    return { user, loading, login, signup, logout, refresh };
   }, [user, loading]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

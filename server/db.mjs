@@ -27,11 +27,14 @@ const client = createClient({
 try {
   await client.executeMultiple(`
 CREATE TABLE IF NOT EXISTS users (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  email      TEXT    UNIQUE NOT NULL,
-  pass_hash  TEXT    NOT NULL,
-  pass_salt  TEXT    NOT NULL,
-  created_at INTEGER NOT NULL
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  email          TEXT    UNIQUE NOT NULL,
+  pass_hash      TEXT    NOT NULL,
+  pass_salt      TEXT    NOT NULL,
+  email_verified INTEGER NOT NULL DEFAULT 0,
+  verify_token   TEXT,
+  verify_expires INTEGER,
+  created_at     INTEGER NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
@@ -57,6 +60,26 @@ CREATE TABLE IF NOT EXISTS watchlist (
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_watchlist_user ON watchlist(user_id);
 `);
+
+  // Migration for databases created before email verification existed:
+  // add the new columns, and mark pre-existing accounts as verified so no
+  // existing user gets locked out.
+  async function ensureColumn(table, column, ddl) {
+    const info = await client.execute(`PRAGMA table_info(${table})`);
+    const exists = info.rows.some((r) => r.name === column);
+    if (!exists) {
+      await client.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddl}`);
+      return true;
+    }
+    return false;
+  }
+  const addedVerified = await ensureColumn('users', 'email_verified', 'INTEGER NOT NULL DEFAULT 0');
+  await ensureColumn('users', 'verify_token', 'TEXT');
+  await ensureColumn('users', 'verify_expires', 'INTEGER');
+  if (addedVerified) {
+    await client.execute('UPDATE users SET email_verified = 1');
+  }
+
 } catch (e) {
   const isTurso = Boolean(tursoUrl);
   console.error('='.repeat(60));

@@ -8,6 +8,7 @@ import Detail from './pages/Detail';
 import Seasonal from './pages/Seasonal';
 import Watchlist from './pages/Watchlist';
 import Auth from './pages/Auth';
+import Verify from './pages/Verify';
 import NotFound from './pages/NotFound';
 
 /**
@@ -27,6 +28,7 @@ export default function App() {
               <Route path="/watchlist" element={<Watchlist />} />
               <Route path="/login" element={<Auth mode="login" />} />
               <Route path="/signup" element={<Auth mode="signup" />} />
+              <Route path="/verify" element={<Verify />} />
               <Route path="/:kind/:id" element={<Detail />} />
               <Route path="*" element={<NotFound />} />
             </Route>

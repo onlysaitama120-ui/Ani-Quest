@@ -30,3 +30,13 @@ services:
         sync: false
       - key: TURSO_AUTH_TOKEN
         sync: false
+      # Email verification (Resend). Get an API key at https://resend.com/api-keys
+      - key: RESEND_API_KEY
+        sync: false
+      # Sender. Requires a verified domain in Resend for real delivery.
+      - key: EMAIL_FROM
+        sync: false
+      # Public URL of this app (used in verification emails). If unset, it is
+      # derived from the request host automatically.
+      - key: APP_URL
+        sync: false
