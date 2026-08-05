@@ -23,6 +23,9 @@ lh.json
 # CI workflow lives locally until GitHub token gains `workflow` scope
 .github/
 
+# Personal local guide (kept off GitHub)
+GUIDE.md
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
